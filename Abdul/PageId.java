@@ -3,7 +3,6 @@ import java.util.Objects;
 /**
  * Identifiant concret d'une page : (numéro de fichier, numéro de page dans le fichier).
  * Pour l'instant le DiskManager n'utilise qu'un seul fichier (fileIdx = 0),
- * mais le champ est prévu pour pouvoir évoluer.
  */
 public class PageId implements IPageId {
     private final int fileIdx;
@@ -26,7 +25,7 @@ public class PageId implements IPageId {
         return fileIdx == p.fileIdx && pageIdx == p.pageIdx;
     }
 
-    /** Obligatoire quand on redéfinit equals (cohérence avec HashMap, HashSet...). */
+    
     @Override
     public int hashCode() { return Objects.hash(fileIdx, pageIdx); }
 
