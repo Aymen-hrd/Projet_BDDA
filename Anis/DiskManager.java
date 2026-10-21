@@ -90,14 +90,6 @@ public class DiskManager implements IDiskManager {
      */
     public void ReadPage(IPageId ipid, ByteBuffer buffer) throws DiskManagerException{
         
-        PageId pageId = (PageId) ipid;
-        if(!isAllocated(ipid)){
-            throw new DiskManagerException("La page n'est pas allouée");
-        }
-        int position = pageId.getPageId()*pageSize;
-        for (int i = 0 ; i < pageSize; i++){
-            buffer.get(position);
-        }
         
     }
 
