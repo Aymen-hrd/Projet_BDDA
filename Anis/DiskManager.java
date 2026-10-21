@@ -1,16 +1,17 @@
-import java.util.List;
-import java.io.RandomAccessFile;
-import java.nio.ByteBuffer;
-import java.util.ArrayDeque;
-import java.util.ArrayList;
+
+import java.io.File;
+import java.io.IOException;
+import java.io.RandomAccessFile;    
+import java.nio.ByteBuffer;         
+import java.util.ArrayDeque;        
 
 public class DiskManager implements IDiskManager {
     
-    private String dmDir;                               //le chemin vers le fichier ".db" de la bdd
-    private byte pageSize;                             //la taille d'une page en bytes
-    private int activePageCount;                      //nombre de pages en cours d'utilisation: utile pour donner l'id de chaque page
-    private ArrayDeque<IPageId> pagesDisponibles;    //une file qui stock les pages desallouées
-    private RandomAccessFile fichierDisque ;             
+    private String dmDir;                             //le chemin vers le dossier de travail
+    private int pageSize;                             //la taille d'une page en bytes
+    private int activePageCount;                      //nombre de pages allouées
+    private ArrayDeque<IPageId> pagesDisponibles;     //une file qui stock l'id (PageId) des pages desallouées
+    private RandomAccessFile fichierDisque ;          //Objet qui fait le lient entre le fichier de travail et le disque 
 
     //constructeur
     public DiskManager(String dmDir,byte pageSize){
@@ -18,54 +19,93 @@ public class DiskManager implements IDiskManager {
         this.pageSize = 0;
         this.activePageCount = 0;
         this.pagesDisponibles = new ArrayDeque<IPageId>();
+        this.fichierDisque = null;
     }
 
 
-     /**
-     * Initializes the disk manager with a target working directory and a page size.
-     * <p>
-     * Binds the disk manager to the new directory.
-     * <ul>
-     * 	 <li>if the disk manager is already bound to a directory, fail.</li> 
-     *   <li>If the directory already contains data, reuse it if compatible.</li> 
-     *   <li>If the directory is empty, initialize it for subsequent use.</li>
-     *   <li>If the directory does not exist, create then use as above.</li>   
-     * </ul>
-     *
-     * @param dmDir    the absolute path to a valid working directory.
-     * @param pageSize the size of a single page in bytes.
-     * @throws DiskManagerException 
-     */
+    /* Initialise le DiskManager avec : 
+        dmDir -> dossier de travail 
+        pageSize 
+    */ 
     @Override 
     public void Init(String dmDir, int pageSize) throws DiskManagerException{
+        
+        //vérifier que le chemin n'est pas null
+        if (dmDir == null || dmDir.strip().isEmpty()){
+            throw new DiskManagerException("Le chemin du fichier est invalide !");
+        }
+        //vérifier que pageSize > 0
+        if (pageSize <= 0){
+            throw new DiskManagerException("La taille d'une page est > 0 !");
+        }
+        //vérifier que le fichier n'est pas déjà ouvert 
+        if (this.fichierDisque != null){    
+            throw new DiskManagerException("Le DiskManager est déjà initialisé !");
+        }
+        
+        //Créer le répertoire où stocker le fichier de données
+        File repertoire = new File(dmDir.strip());
+        
+        if(!repertoire.exists()){
+            if(!repertoire.mkdirs()){
+                throw new DiskManagerException("Impossible de créer le répertoire !");
+            }
+        }
 
+        //vérifier que le chemin correspond à un répertoire
+        if(!repertoire.isDirectory()){
+            throw new DiskManagerException("Le chemin indiqué ne correspond pas à un répertoire !");
+        }
+
+        // création du fichier data qui contiendra les données des pages
+        File fichier = new File(repertoire,"data");  
+        try {
+            boolean fichierExiste = fichier.exists() && fichier.length()>0;
+
+            this.fichierDisque = new RandomAccessFile(fichier, "rw");
+            this.dmDir = repertoire.getAbsolutePath();
+            this.pageSize = pageSize;
+
+            /*Si le fichier existe déjà, on récupère le nombre de pages qu'il contient
+              pour reconstruire activePageCount */
+            if (fichierExiste){
+
+                long fileLength = fichierDisque.length();
+                if (fileLength % pageSize != 0) {
+                    throw new DiskManagerException("Taille du fichier incompatible avec le pageSize fourni !");
+                }
+                this.activePageCount = (int) (fileLength / pageSize);
+            } else {
+            this.activePageCount = 0;
+            }
+            // On vide la liste des pages libres au démarrage
+            this.pagesDisponibles.clear();
+
+        } catch (IOException e){
+            throw new DiskManagerException("Erreur lors de l'ouverture du fichier !");
     }
+}
 
 
-     /**
-     * Persists the current state and metadata of the disk manager
-     * to the working directory. 
-     *
-     * Cette méthode fera des opérations d'écriture dans le disque
-     * 
-     * @throws DiskManagerException
+    /**
+     * Sauvegarde et écriture des données sur le disque.
      */
-    public void Save() throws DiskManagerException{
+    public void Save() throws DiskManagerException {
+        if (this.fichierDisque == null) {
+            throw new DiskManagerException("Le DiskManager n'est pas initialisé !");
+        }
+        try {
+            // écriture des données sur le disque
+            this.fichierDisque.getFD().sync();
+        } catch (IOException e) {
+            throw new DiskManagerException("Erreur lors de la sauvegarde : " + e.getMessage());
+        }
+    }   
 
-    }
-
-     /**
-     * Allocates a new page requested by the upper layers of the DBMS.
-     * <p>
-     * Allocation policy:
-     * <ol>
-     *   <li>If a previously deallocated page is available, reuse it.</li>
-     *   <li>Otherwise, append a new page to the disk storage.</li>
-     * </ol>
-     *
-     * @return the {@link IPageId} identifying the newly allocated page.
-     * @throws DiskManagerException
+    /**
+     * Alloue une nouvelle page || réutilise une page libre || en ajoute une nouvelle).
      */
+    @Override 
     public IPageId AllocPage() throws DiskManagerException{
         IPageId allocatedPage;
         if(!pagesDisponibles.isEmpty()){
@@ -79,46 +119,76 @@ public class DiskManager implements IDiskManager {
 
 
     /**
-     * Reads the on-disk content of the page designated by {@code ipid}
-     * into the provided buffer.
-     * <p>
-     * Note: The caller is responsible for allocating and passing the destination buffer.
-     *
-     * @param ipid   the identifier of the page to read.
-     * @param buffer the buffer into which data will be copied
-     * @throws DiskManagerException
+     * Lit le contenu d'une page du disque dans un buffer.
      */
-    public void ReadPage(IPageId ipid, ByteBuffer buffer) throws DiskManagerException{
+    @Override
+    public void ReadPage(IPageId ipid, ByteBuffer buffer) throws DiskManagerException {
+    if (this.fichierDisque == null) {
+        throw new DiskManagerException("Le DiskManager n'est pas initialisé !");
+    }
+    if (!isAllocated(ipid)) {
+        throw new DiskManagerException("Erreur : la page n'est pas allouée !");
+    }
+    if (buffer == null) {
+        throw new DiskManagerException("Le buffer n'est pas initialisé !");
+    }
+
+    //calcul de la position de la page que l'on doit lire sur le disque
+    PageId pageId = (PageId) ipid;
+    long position = (long) pageId.getPageId() * pageSize;
+    byte[] donnees = new byte[pageSize];
+
+    try {
+
+        // Se placer au bon endroit dans le fichier et lire la page
+        fichierDisque.seek(position);
+        fichierDisque.readFully(donnees); 
+        buffer.put(donnees);             
+
+    } catch (IOException e) {
+        throw new DiskManagerException("Erreur lors de la lecture de la page : " + e.getMessage());
+    }
+}
+
+    /**
+     * Écrit le contenu d'un buffer dans une page sur le disque.
+     */
+    public void WritePage(IPageId ipid, ByteBuffer buffer) throws DiskManagerException {
+        if (this.fichierDisque == null) {
+            throw new DiskManagerException("Le DiskManager n'est pas initialisé !");
+        }
+        if (!isAllocated(ipid)) {
+            throw new DiskManagerException("La page n'est pas allouée !");
+        }
+        if (buffer == null) {
+            throw new DiskManagerException("Le buffer est null !");
+        }
+
+        PageId pageId = (PageId) ipid;
+        long position = (long) pageId.getPageId() * pageSize;
+        byte[] donnees = new byte[pageSize];
         
-        
+        // Récupèrer les données depuis le buffer
+        buffer.get(donnees);
+
+        try {
+            // Se placer au bon endroit et écrire les données
+            fichierDisque.seek(position); //seek() -> positionner le pointeur du fichier au début de la page voulue
+            fichierDisque.write(donnees); // écrire les données dans le disque
+        } catch (IOException e) {
+            throw new DiskManagerException("Erreur lors de l'écriture de la page : " + e.getMessage());
+        }
     }
 
     /**
-     * Writes the content of the provided buffer into the page designated by {@code ipid}.
-     * This is the counterpart of {@link #ReadPage(IPageId, ByteBuffer)}.
-     *
-     * @param ipid   the identifier of the target page.
-     * @param buffer the buffer containing the data to write.
-     * @throws DiskManagerException
-     */
-    public void WritePage(IPageId ipid, ByteBuffer buffer) throws DiskManagerException{
-        
-        
-    }
-
-    /**
-     * Deallocates the page identified by {@code ipid}, marking it as available
-     * for future allocations.
-     *
-     * @param ipid the identifier of the page to free.
-     * @throws DiskManagerException
+     * Désalloue une page pour qu'elle devienne disponible.
      */
     public void DeallocPage(IPageId ipid) throws DiskManagerException {
-   
+        //vérifier que l'id de ipid est correct
         if (!isIdValid(ipid)) {
         throw new DiskManagerException("Identifiant de page invalide !");
         }
-
+        //vérifier que l'on desalloue pas une page déjà desallouée
         if (pagesDisponibles.contains(ipid)) {
         throw new DiskManagerException(
             "Double désallocation : la page est déjà désallouée !");
@@ -128,26 +198,16 @@ public class DiskManager implements IDiskManager {
 }
 
     /**
-     * vérifie que la page avec l'id ipid est bien allouée
-     * @param ipid l'identifiant de la page à vérifier 
-     * @throws DiskManagerException
+     * Vérifie si une page est bien allouée (et non libre).
      */
     private boolean isAllocated(IPageId ipid){
         if (!isIdValid(ipid)) 
             return false;
         return !pagesDisponibles.contains(ipid);
-
-        /*for (IPageId p:pagesDisponibles){
-            if (p.equals(ipid)){
-                return false; 
-            }
-        }*/
     }
 
     /**
-     * vérfie que l'id d'une page est valide
-     * @param ipid
-     * @return
+     * Vérifie si l'ID d'une page est valide (dans les limites).
      */
     private boolean isIdValid(IPageId ipid) {
     return ipid instanceof PageId
@@ -157,18 +217,14 @@ public class DiskManager implements IDiskManager {
 
     
     /**
-     * Returns the total number of pages currently in use (allocated and not yet deallocated).
-     *
-     * @return the count of active allocated pages.
+     * Retourne le nombre total de pages actives.
      */
     public int GetActivePageCount(){
         return activePageCount;
     }
 
     /**
-     * Returns the configured page size in bytes managed by this disk manager.
-     *
-     * @return the page size in bytes.
+     * Retourne la taille d'une page en octets.
      */
     public int GetPageSize(){
         return pageSize;

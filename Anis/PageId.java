@@ -2,7 +2,7 @@
  * la classe PageId sert uniquement à identifier une page 
  * Elle ne gère pas sont état.
  * Une BDD contiendra des miliers de pages, surcharger les objets de type PageId 
- * serait une mauvaise idée, cela serait couteux en mémoire et en computation.
+ * serait une mauvaise idée, cela serait couteux en mémoire et en performance.
  */
 public class PageId implements IPageId {
 

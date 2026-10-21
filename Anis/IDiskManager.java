@@ -26,7 +26,6 @@ public interface IDiskManager {
     /**
      * Persists the current state and metadata of the disk manager
      * to the working directory.
-     *
      * @throws DiskManagerException
      */
     void Save() throws DiskManagerException;
@@ -39,7 +38,6 @@ public interface IDiskManager {
      *   <li>If a previously deallocated page is available, reuse it.</li>
      *   <li>Otherwise, append a new page to the disk storage.</li>
      * </ol>
-     *
      * @return the {@link IPageId} identifying the newly allocated page.
      * @throws DiskManagerException
      */
@@ -50,7 +48,6 @@ public interface IDiskManager {
      * into the provided buffer.
      * <p>
      * Note: The caller is responsible for allocating and passing the destination buffer.
-     *
      * @param ipid   the identifier of the page to read.
      * @param buffer the buffer into which data will be copied
      * @throws DiskManagerException
@@ -60,7 +57,6 @@ public interface IDiskManager {
     /**
      * Writes the content of the provided buffer into the page designated by {@code ipid}.
      * This is the counterpart of {@link #ReadPage(IPageId, ByteBuffer)}.
-     *
      * @param ipid   the identifier of the target page.
      * @param buffer the buffer containing the data to write.
      * @throws DiskManagerException
@@ -70,7 +66,6 @@ public interface IDiskManager {
     /**
      * Deallocates the page identified by {@code ipid}, marking it as available
      * for future allocations.
-     *
      * @param ipid the identifier of the page to free.
      * @throws DiskManagerException
      */
@@ -78,14 +73,12 @@ public interface IDiskManager {
 
     /**
      * Returns the total number of pages currently in use (allocated and not yet deallocated).
-     *
      * @return the count of active allocated pages.
      */
     int GetActivePageCount();
 
     /**
      * Returns the configured page size in bytes managed by this disk manager.
-     *
      * @return the page size in bytes.
      */
     int GetPageSize();
