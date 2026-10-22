@@ -1,3 +1,8 @@
+package tp01_disque;
+
+import commun.IDiskManager;
+import commun.IPageId;
+import commun.DiskManagerException;
 
 import java.io.File;
 import java.io.IOException;
@@ -14,7 +19,7 @@ public class DiskManager implements IDiskManager {
     private RandomAccessFile fichierDisque ;          //Objet qui fait le lient entre le fichier de travail et le disque 
 
     //constructeur
-    public DiskManager(String dmDir,byte pageSize){
+    public DiskManager(){
         this.dmDir = null;
         this.pageSize = 0;
         this.activePageCount = 0;

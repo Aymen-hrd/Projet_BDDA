@@ -1,3 +1,5 @@
+package commun;
+
 import java.nio.ByteBuffer;
 
 /**

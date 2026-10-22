@@ -1,3 +1,7 @@
+package tp01_disque;
+
+import commun.IPageId;
+
 /**
  * la classe PageId sert uniquement à identifier une page 
  * Elle ne gère pas sont état.

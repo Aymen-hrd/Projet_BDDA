@@ -1,3 +1,5 @@
+package commun;
+
 /**
  * Interface representing a unique identifier for a disk storage page
  * in the database management system.

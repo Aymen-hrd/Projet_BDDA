@@ -1,3 +1,5 @@
+package commun;
+
 /**
  * Exception thrown when an error occurs during disk manager operations,
  * such as I/O failures, invalid directory paths, incompatible page sizes,
