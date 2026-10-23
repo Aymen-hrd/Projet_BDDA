@@ -77,11 +77,11 @@ public interface IDiskManager {
      * Returns the total number of pages currently in use (allocated and not yet deallocated).
      * @return the count of active allocated pages.
      */
-    int GetActivePageCount();
+    int GetActivePageCount() throws DiskManagerException;
 
     /**
      * Returns the configured page size in bytes managed by this disk manager.
      * @return the page size in bytes.
      */
-    int GetPageSize();
+    int GetPageSize() throws DiskManagerException;
 }

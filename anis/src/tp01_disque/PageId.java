@@ -16,6 +16,11 @@ public class PageId implements IPageId {
     public PageId(int pageId){
         this.pageId = pageId;
     }
+
+    @Override
+    public int hashCode() {
+        return Integer.hashCode(pageId);
+    }
     
     @Override
     public boolean equals(Object obj) {
